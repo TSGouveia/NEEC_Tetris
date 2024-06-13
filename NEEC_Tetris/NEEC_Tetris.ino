@@ -1,3 +1,6 @@
+#include <ArduinoJson.h>
+#include <HTTPClient.h>
+#include <WiFi.h>
 #include "piece_data.h"
 #include <Wire.h>
 
@@ -9,6 +12,13 @@
 #define DOUBLE 100
 #define TRIPLE 300
 #define TETRIS 1200
+
+#define SSID "Pastel di nata"
+#define PASS "OsMaisBilhas"
+
+#define DEBUG_LED_PIN 2
+
+#define SCOREBOARD_URL "https://keepthescore.com/api/zfhvdblbcjlme/player/"
 
 const unsigned long MICROS_PER_FRAME = 1000000.0 / FRAMES_PER_SECOND;
 const int DROP_RATE_LEVELS[15] = { 48, 43, 38, 33, 28, 23, 18, 13, 8, 6, 5, 4, 3, 2, 1 };
@@ -43,6 +53,9 @@ int level = 0;
 int linesCleared = 0;
 int linesToLevelUp = 10;
 
+char holdPiece = 0;
+bool canHoldPiece = true;
+
 unsigned int score = 0;
 
 unsigned long debugTimer = 0;
@@ -57,6 +70,8 @@ void setup() {
   SpawnPiece(pieceNumber);
 
   debugTimer = micros();
+
+  pinMode(DEBUG_LED_PIN, OUTPUT);
 }
 
 void loop() {
@@ -248,6 +263,7 @@ void LockPiece() {
   CheckForClearedLines();
   int pieceNumber = random(7);
   SpawnPiece(pieceNumber);
+  canHoldPiece = true;
 }
 
 void handleButtonPressed(int buttonNumberPressed) {
@@ -327,12 +343,14 @@ void handleButtonPressed(int buttonNumberPressed) {
       break;
     // L1 button pressed
     case 7:
+      HoldPiece();
       break;
     // L1 button released
     case -7:
       break;
     // R1 button pressed
     case 8:
+      HoldPiece();
       break;
     // R1 button released
     case -8:
@@ -684,8 +702,112 @@ void GameOver() {
   Serial.println(linesCleared);
   Serial.print("Level reached: ");
   Serial.println(level);
+  SendValueToScoreboard();
 }
 
+void HoldPiece() {
+  if (!canHoldPiece)
+    return;
+  char aux = holdPiece;
+  holdPiece = pieceLetter;
+  if (aux == 0) {
+    PutPieceMatrix(currentPositionX, currentPositionY, false);
+    int pieceNumber = random(7);
+    SpawnPiece(pieceNumber);
+    return;
+  } else {
+    pieceLetter = aux;
+    PutPieceMatrix(currentPositionX, currentPositionY, false);
+    for (int i = 0; i < 7; i++) {
+      if (pieceLetter == tetrominoes[i]) {
+        SpawnPiece(i);
+        break;
+      }
+    }
+  }
+  canHoldPiece = false;
+}
+
+// ******************************************************
+// LEADERBOARD
+// ******************************************************
+void ConnectToWifi() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.print("Attempting to connect to SSID: ");
+    Serial.println(SSID);
+    while (WiFi.status() != WL_CONNECTED) {
+      WiFi.begin(SSID, PASS);
+      Serial.println("Connecting to WiFi");
+      while (WiFi.status() != WL_CONNECTED) {
+        delay(100);
+      }
+    }
+    Serial.println("Connected");
+    digitalWrite(DEBUG_LED_PIN, HIGH);
+  }
+}
+
+String CriaJson(char* playerName, int score) {
+  // Tamanho do JSON baseado nos campos fornecidos
+  const size_t capacity = JSON_OBJECT_SIZE(8);
+
+  // Criação do objeto JSON
+  DynamicJsonDocument doc(capacity);
+
+  // Preenchendo o objeto JSON com os dados
+  doc["name"] = playerName;
+  doc["score"] = score;
+  doc["is_eliminated"] = false;
+  doc["goal"] = nullptr;              // Valor null
+  doc["text_color"] = nullptr;        // Valor null
+  doc["background_color"] = nullptr;  // Valor null
+  doc["profile_image"] = nullptr;     // Valor null
+  doc["team"] = nullptr;              // Valor null
+
+  // Serializa o objeto JSON para uma string
+  String jsonStr;
+  serializeJson(doc, jsonStr);
+
+  return jsonStr;
+}
+
+void SendPostRequest(String json) {
+  HTTPClient http;
+
+  // Configura o URL e o endpoint do servidor
+  http.begin(SCOREBOARD_URL);
+
+  // Configura cabeçalho do conteúdo JSON
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("accept", "*/*");  // Configuração opcional dependendo da API
+
+  // Envie o POST e aguarde a resposta
+  int httpResponseCode = http.POST(json);
+
+  // Verifique o código de resposta
+  if (httpResponseCode > 0) {
+    Serial.print("Resposta HTTP recebida: ");
+    Serial.println(httpResponseCode);
+    String resposta = http.getString();
+    Serial.println("Resposta do servidor: " + resposta);
+  } else {
+    Serial.print("Erro na requisição HTTP: ");
+    Serial.println(httpResponseCode);
+  }
+
+  // Libere os recursos
+  http.end();
+}
+
+void SendValueToScoreboard() {
+  ConnectToWifi();
+  String json = CriaJson("Bilha", score);
+  SendPostRequest(json);
+  WiFi.disconnect();
+  if (WiFi.status() != WL_CONNECTED) {
+    digitalWrite(DEBUG_LED_PIN, LOW);
+  }
+}
 //DEBUG
 void ShowBoard() {
   Serial.print("\n\n\n\n\n\n\n");
