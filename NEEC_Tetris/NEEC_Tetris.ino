@@ -5,6 +5,11 @@
 #define WIDTH 10
 #define FRAMES_PER_SECOND 60
 
+#define SINGLE 40
+#define DOUBLE 100
+#define TRIPLE 300
+#define TETRIS 1200
+
 const unsigned long MICROS_PER_FRAME = 1000000.0 / FRAMES_PER_SECOND;
 const int DROP_RATE_LEVELS[15] = { 48, 43, 38, 33, 28, 23, 18, 13, 8, 6, 5, 4, 3, 2, 1 };
 
@@ -26,8 +31,6 @@ bool rightIsPressed = false;
 
 bool gameIsPaused = false;
 
-//Tetris logic
-
 //Movement logic
 int dasCounter = 0;
 int gravityCounter = 0;
@@ -36,8 +39,11 @@ int lockMaxFrames = 15;
 int lockCounter = 0;
 
 //Level logic
-int level = 1;
+int level = 0;
 int linesCleared = 0;
+int linesToLevelUp = 10;
+
+unsigned int score = 0;
 
 unsigned long debugTimer = 0;
 
@@ -488,7 +494,7 @@ bool RotateTest2(int oldRotation, int newRotation) {
       offsetY = 0;
     }
   }
-  Serial.printf("2: %d %d | %d %d",currentPositionX, offsetX ,currentPositionY,offsetY);
+  Serial.printf("2: %d %d | %d %d", currentPositionX, offsetX, currentPositionY, offsetY);
   if (hasCollidedWithScreen(currentPositionX + offsetX, currentPositionY - offsetY) || hasCollidedWithPiece(currentPositionX + offsetX, currentPositionY - offsetY)) {
     return false;
   }
@@ -528,13 +534,13 @@ bool RotateTest3(int oldRotation, int newRotation) {
       offsetY = -1;
     }
   }
-  Serial.printf("3: %d %d | %d %d",currentPositionX, offsetX ,currentPositionY,offsetY);
+  Serial.printf("3: %d %d | %d %d", currentPositionX, offsetX, currentPositionY, offsetY);
   if (hasCollidedWithScreen(currentPositionX + offsetX, currentPositionY - offsetY) || hasCollidedWithPiece(currentPositionX + offsetX, currentPositionY - offsetY)) {
     return false;
   }
   currentPositionX += offsetX;
   currentPositionY -= offsetY;
-  
+
   PutPieceMatrix(currentPositionX, currentPositionY, true);
   return true;
 }
@@ -563,7 +569,7 @@ bool RotateTest4(int oldRotation, int newRotation) {
       offsetY = 0;
     }
   }
-  Serial.printf("4: %d %d | %d %d",currentPositionX, offsetX ,currentPositionY,offsetY);
+  Serial.printf("4: %d %d | %d %d", currentPositionX, offsetX, currentPositionY, offsetY);
   if (hasCollidedWithScreen(currentPositionX + offsetX, currentPositionY - offsetY) || hasCollidedWithPiece(currentPositionX + offsetX, currentPositionY - offsetY)) {
     return false;
   }
@@ -603,7 +609,7 @@ bool RotateTest5(int oldRotation, int newRotation) {
       offsetY = 2;
     }
   }
-  Serial.printf("5: %d %d | %d %d",currentPositionX, offsetX ,currentPositionY,offsetY);
+  Serial.printf("5: %d %d | %d %d", currentPositionX, offsetX, currentPositionY, offsetY);
   if (hasCollidedWithScreen(currentPositionX + offsetX, currentPositionY - offsetY) || hasCollidedWithPiece(currentPositionX + offsetX, currentPositionY - offsetY)) {
     return false;
   }
@@ -614,6 +620,7 @@ bool RotateTest5(int oldRotation, int newRotation) {
 }
 
 void CheckForClearedLines() {
+  int numberOfLinesCleared = 0;
   for (int row = 0; row < HEIGTH; row++) {
     bool shouldClear = true;
     for (int col = 0; col < WIDTH; col++) {
@@ -624,26 +631,59 @@ void CheckForClearedLines() {
     }
     if (shouldClear) {
       ShiftLinesDown(row);
+      numberOfLinesCleared++;
       row--;  // Check the same row again as it has new content after shifting
     }
+  }
+  switch (numberOfLinesCleared) {
+    case 0: break;
+    case 1:
+      score += SINGLE * (level + 1);
+      break;
+    case 2:
+      score += DOUBLE * (level + 1);
+      break;
+    case 3:
+      score += TRIPLE * (level + 1);
+      break;
+    case 4:
+      score += TETRIS * (level + 1);
+      break;
+    default:
+      Serial.println("[ERROR] - Couldn't count rows cleared while calculating score");
+      break;
   }
 }
 
 void ShiftLinesDown(int clearedRow) {
-  linesCleared++;
   for (int row = clearedRow; row > 0; row--) {
     memcpy(tetrisBoard[row], tetrisBoard[row - 1], WIDTH * sizeof(unsigned char));
   }
   // Clear the top line after shifting
   memset(tetrisBoard[0], 0, WIDTH * sizeof(unsigned char));
+
+  linesCleared++;
+
+  if (linesCleared >= linesToLevelUp) {
+    level++;
+    if (level >= 9 && level <= 15 || level >= 25) {
+      // Bug do tetris a calcular linhas, não faz nada
+    } else {
+      linesToLevelUp += 10;
+    }
+  }
 }
 
 void GameOver() {
   gameIsPaused = true;
   Serial.print("\n\n\n\n\n\n\n");
   Serial.println("=[Game Over]=");
+  Serial.print("Score: ");
+  Serial.println(score);
   Serial.print("Lines cleared: ");
   Serial.println(linesCleared);
+  Serial.print("Level reached: ");
+  Serial.println(level);
 }
 
 //DEBUG
