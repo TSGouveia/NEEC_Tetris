@@ -71,7 +71,7 @@ void setup() {
 
   debugTimer = micros();
 
-  pinMode(DEBUG_LED_PIN, OUTPUT);
+  pinMode(DEBUG_LED_PIN, OUTPUT);  
 }
 
 void loop() {
@@ -172,7 +172,6 @@ bool hasCollidedWithScreen(int positionX, int positionY) {
     xOffset = currentPieceShape[i][0];
     yOffset = currentPieceShape[i][1];
     if (positionX + xOffset < 0 || positionY + yOffset < 0 || positionX + xOffset >= WIDTH || positionY + yOffset >= HEIGTH) {
-      Serial.println("SCREEN");
       return true;
     }
   }
@@ -185,7 +184,6 @@ bool hasCollidedWithPiece(int positionX, int positionY) {
     xOffset = currentPieceShape[i][0];
     yOffset = currentPieceShape[i][1];
     if (tetrisBoard[yOffset + positionY][xOffset + positionX]) {
-      Serial.println("PIECE");
       return true;
     }
   }
@@ -781,17 +779,16 @@ void SendPostRequest(String json) {
   http.addHeader("Content-Type", "application/json");
   http.addHeader("accept", "*/*");  // Configuração opcional dependendo da API
 
+  Serial.println("A enviar score...");
   // Envie o POST e aguarde a resposta
   int httpResponseCode = http.POST(json);
 
   // Verifique o código de resposta
   if (httpResponseCode > 0) {
-    Serial.print("Resposta HTTP recebida: ");
-    Serial.println(httpResponseCode);
     String resposta = http.getString();
-    Serial.println("Resposta do servidor: " + resposta);
+    Serial.println("Score enviado com sucesso");
   } else {
-    Serial.print("Erro na requisição HTTP: ");
+    Serial.print("Erro a enviar score");
     Serial.println(httpResponseCode);
   }
 
@@ -808,6 +805,7 @@ void SendValueToScoreboard() {
     digitalWrite(DEBUG_LED_PIN, LOW);
   }
 }
+
 //DEBUG
 void ShowBoard() {
   Serial.print("\n\n\n\n\n\n\n");

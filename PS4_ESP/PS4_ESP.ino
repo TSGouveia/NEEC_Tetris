@@ -1,72 +1,66 @@
 #include <Wire.h>
 #include <PS4Controller.h>
 
+#define BUTTON_NUMBER 11
+#define DEBUG_LED_PIN 2
+
+// Variable to store the previous state of each button
+bool prevButtonState[BUTTON_NUMBER] = { 0 };
+
 void setup() {
   Wire.begin();
-  Serial.begin(115200);
-  //MAC ADDRESS DO MOVEL DO GOUVEIA
+
+  // MAC ADDRESS DO MOVEL DO GOUVEIA
   PS4.begin("B0:4A:6A:56:FD:B5");
-  Serial.println("Ready.");
+  pinMode(DEBUG_LED_PIN, OUTPUT);
+  digitalWrite(DEBUG_LED_PIN, HIGH);
 }
 
 void loop() {
   // Below has all accessible outputs from the controller
   if (PS4.isConnected()) {
-    if (PS4.Right()) Wire.write("Right Button");
-    if (PS4.Down()) Wire.write("Down Button");
-    if (PS4.Up()) Wire.write("Up Button");
-    if (PS4.Left()) Wire.write("Left Button");
-
-    if (PS4.Square()) Wire.write("Square Button");
-    if (PS4.Cross()) Wire.write("Cross Button");
-    if (PS4.Circle()) Wire.write("Circle Button");
-    if (PS4.Triangle()) Wire.write("Triangle Button");
-
-    if (PS4.UpRight()) Wire.write("Up Right");
-    if (PS4.DownRight()) Wire.write("Down Right");
-    if (PS4.UpLeft()) Wire.write("Up Left");
-    if (PS4.DownLeft()) Wire.write("Down Left");
-
-    if (PS4.L1()) Wire.write("L1 Button");
-    if (PS4.R1()) Wire.write("R1 Button");
-
-    if (PS4.Share()) Wire.write("Share Button");
-    if (PS4.Options()) Wire.write("Options Button");
-    if (PS4.L3()) Wire.write("L3 Button");
-    if (PS4.R3()) Wire.write("R3 Button");
-
-    if (PS4.PSButton()) Wire.write("PS Button");
-    if (PS4.Touchpad()) Wire.write("Touch Pad Button");
-
-    if (PS4.L2()) {
-      Serial.printf("L2 button at %d\n", PS4.L2Value());
+    digitalWrite(DEBUG_LED_PIN, LOW);
+    if (PS4.PSButton() && PS4.Options()) {
+      ESP.restart();
     }
-    if (PS4.R2()) {
-      Serial.printf("R2 button at %d\n", PS4.R2Value());
-    }
+    // Check each button state
+    bool buttonState[BUTTON_NUMBER] = {
+      PS4.Right(),
+      PS4.Down(),
+      PS4.Up(),
+      PS4.Left(),
+      PS4.Cross(),
+      PS4.Circle(),
+      PS4.L1(),
+      PS4.R1(),
+      PS4.Share(),
+      PS4.Options(),
+      PS4.PSButton(),
+    };
 
-    if (PS4.LStickX()) {
-      Serial.printf("Left Stick x at %d\n", PS4.LStickX());
-    }
-    if (PS4.LStickY()) {
-      Serial.printf("Left Stick y at %d\n", PS4.LStickY());
-    }
-    if (PS4.RStickX()) {
-      Serial.printf("Right Stick x at %d\n", PS4.RStickX());
-    }
-    if (PS4.RStickY()) {
-      Serial.printf("Right Stick y at %d\n", PS4.RStickY());
+    // Iterate through each button
+    for (int i = 0; i < BUTTON_NUMBER; i++) {
+      // Check if the button is currently pressed and was not pressed previously
+      //BUTTON WAS PRESSED
+      if (buttonState[i] && !prevButtonState[i]) {
+        // Send data corresponding to the button
+
+        Wire.beginTransmission(8);
+        Wire.write(i + 1);
+        Wire.endTransmission();
+      }
+      //BUTTON WAS RELEASED
+      if (!buttonState[i] && prevButtonState[i]) {
+        // Send data corresponding to the button
+        Wire.beginTransmission(8);
+        Wire.write(-(i + 1));
+        Wire.endTransmission();
+      }
+      // Update the previous state of the button
+      prevButtonState[i] = buttonState[i];
     }
 
-    if (PS4.Charging())  Serial.println("The controller is charging");
-    if (PS4.Audio())  Serial.println("The controller has headphones attached");
-    if (PS4.Mic())  Serial.println("The controller has a mic attached");
-
-    Serial.printf("Battery Level : %d\n", PS4.Battery());
-
-    Serial.println();
-    // This delay is to make the output more human readable
-    // Remove it when you're not trying to see the output
-    delay(1000);
+    // Add a small delay to prevent spamming I2C
+    delay(10);
   }
 }
