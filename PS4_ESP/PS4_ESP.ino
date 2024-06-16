@@ -10,8 +10,8 @@ bool prevButtonState[BUTTON_NUMBER] = { 0 };
 void setup() {
   Wire.begin();
 
-  // MAC ADDRESS DO MOVEL DO GOUVEIA
-  PS4.begin("B0:4A:6A:56:FD:B5");
+  // MAC ADDRESS DE UM MOVEL AI
+  PS4.begin("22:22:D9:D5:19:E3");
   pinMode(DEBUG_LED_PIN, OUTPUT);
   digitalWrite(DEBUG_LED_PIN, HIGH);
 }
