@@ -743,7 +743,7 @@ void GameOver() {
   Serial.println(linesCleared);
   Serial.print("Level reached: ");
   Serial.println(level);
-  //SendValueToScoreboard();
+  SendScore("ABC",score);
 }
 
 void HoldPiece() {
@@ -769,87 +769,22 @@ void HoldPiece() {
   canHoldPiece = false;
 }
 
-// ******************************************************
-// LEADERBOARD
-// ******************************************************
-/*
-void ConnectToWifi() {
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.print("Attempting to connect to SSID: ");
-    Serial.println(SSID);
-    while (WiFi.status() != WL_CONNECTED) {
-      WiFi.begin(SSID, PASS);
-      Serial.println("Connecting to WiFi");
-      while (WiFi.status() != WL_CONNECTED) {
-        delay(100);
-      }
-    }
-    Serial.println("Connected");
-    digitalWrite(DEBUG_LED_PIN, HIGH);
-  }
+void SendScore(name,score){
+  // Crie um objeto JSON com os valores que deseja enviar
+  StaticJsonDocument<256> docJson;
+  docJson["name"] = name;
+  docJson["score"] = score;
+
+  // Serializa o JSON em uma string
+  char json[256];
+  serializeJson(docJson, json);
+
+  // Envia o JSON para o endereço 8 via I2C
+  Wire.beginTransmission(9);
+  Wire.write(json);
+  Wire.endTransmission();
 }
 
-String CriaJson(char* playerName, int score) {
-  // Tamanho do JSON baseado nos campos fornecidos
-  const size_t capacity = JSON_OBJECT_SIZE(8);
-
-  // Criação do objeto JSON
-  DynamicJsonDocument doc(capacity);
-
-  // Preenchendo o objeto JSON com os dados
-  doc["name"] = playerName;
-  doc["score"] = score;
-  doc["is_eliminated"] = false;
-  doc["goal"] = nullptr;              // Valor null
-  doc["text_color"] = nullptr;        // Valor null
-  doc["background_color"] = nullptr;  // Valor null
-  doc["profile_image"] = nullptr;     // Valor null
-  doc["team"] = nullptr;              // Valor null
-
-  // Serializa o objeto JSON para uma string
-  String jsonStr;
-  serializeJson(doc, jsonStr);
-
-  return jsonStr;
-}
-
-void SendPostRequest(String json) {
-  HTTPClient http;
-
-  // Configura o URL e o endpoint do servidor
-  http.begin(SCOREBOARD_URL);
-
-  // Configura cabeçalho do conteúdo JSON
-  http.addHeader("Content-Type", "application/json");
-  http.addHeader("accept", "/*");  // Configuração opcional dependendo da API
-
-  Serial.println("A enviar score...");
-  // Envie o POST e aguarde a resposta
-  int httpResponseCode = http.POST(json);
-
-  // Verifique o código de resposta
-  if (httpResponseCode > 0) {
-    String resposta = http.getString();
-    Serial.println("Score enviado com sucesso");
-  } else {
-    Serial.print("Erro a enviar score");
-    Serial.println(httpResponseCode);
-  }
-
-  // Libere os recursos
-  http.end();
-}
-
-void SendValueToScoreboard() {
-  ConnectToWifi();
-  String json = CriaJson("Bilha", score);
-  SendPostRequest(json);
-  WiFi.disconnect();
-  if (WiFi.status() != WL_CONNECTED) {
-    digitalWrite(DEBUG_LED_PIN, LOW);
-  }
-}
-*/
 //DEBUG
 void ShowBoard() {
   Serial.print("\n\n\n\n\n\n\n");
