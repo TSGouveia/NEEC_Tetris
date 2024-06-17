@@ -1,8 +1,20 @@
 #include <ArduinoJson.h>
-#include <HTTPClient.h>
-#include <WiFi.h>
 #include "piece_data.h"
 #include <Wire.h>
+
+//LEDS
+#include <FastLED.h>
+#include <LEDMatrix.h>
+
+// Change the next 6 defines to match your matrix type and size
+//LEDS
+#define LED_PIN 16
+#define COLOR_ORDER RGB
+#define CHIPSET WS2812B
+
+#define MATRIX_WIDTH 32                       // Set this negative if physical led 0 is opposite to where you want logical 0
+#define MATRIX_HEIGHT 18                      // Set this negative if physical led 0 is opposite to where you want logical 0
+#define MATRIX_TYPE HORIZONTAL_ZIGZAG_MATRIX  // See top of LEDMatrix.h for matrix wiring types
 
 #define HEIGTH 20 + 2  //+2 para n foder a rotação do I piece no inicio
 #define WIDTH 10
@@ -19,6 +31,15 @@
 #define DEBUG_LED_PIN 2
 
 #define SCOREBOARD_URL "https://keepthescore.com/api/zfhvdblbcjlme/player/"
+
+//COLORS
+#define CYAN_I 0x00FFFF
+#define YELLOW_O 0xFFFF00
+#define PURPLE_T 0x800080
+#define GREEN_S 0x00FF00
+#define RED_Z 0xFF0000
+#define BLUE_J 0x0000FF
+#define ORANGE_L 0xFF7F00
 
 const unsigned long MICROS_PER_FRAME = 1000000.0 / FRAMES_PER_SECOND;
 const int DROP_RATE_LEVELS[15] = { 48, 43, 38, 33, 28, 23, 18, 13, 8, 6, 5, 4, 3, 2, 1 };
@@ -62,8 +83,11 @@ unsigned long debugTimer = 0;
 
 void (*resetFunc)(void) = 0;
 
+//MESA DE LEDS
+cLEDMatrix<MATRIX_WIDTH, MATRIX_HEIGHT, MATRIX_TYPE> leds;
+
 void setup() {
-  Serial.begin(115200);
+  //Serial.begin(9600);
   SetupPS4I2C();
 
   int pieceNumber = random(7);
@@ -71,10 +95,32 @@ void setup() {
 
   debugTimer = micros();
 
-  pinMode(DEBUG_LED_PIN, OUTPUT);  
+  pinMode(DEBUG_LED_PIN, OUTPUT);
+
+  SetupFastLeds();
+
+  ResetLedMatrix();
+  FastLED.show();
+  delay(100);
+}
+void SetupFastLeds() {
+
+  FastLED.addLeds<CHIPSET, LED_PIN, COLOR_ORDER>(leds[0], 576);
+  FastLED.addLeds<CHIPSET, LED_PIN, GRB>(leds[0], 13);
+
+  FastLED.setBrightness(127);
+  FastLED.clear(true);
 }
 
+void ResetLedMatrix() {
+  for (int x = 0; x < MATRIX_WIDTH; ++x) {
+    for (int y = 0; y < MATRIX_HEIGHT; ++y) {
+      leds(x, y) = 0;
+    }
+  }
+}
 void loop() {
+
   frameTimer = micros();
   while (micros() - frameTimer < MICROS_PER_FRAME) {
     //26000 iterações cá dentro, deve ser suficiente para os controlos responderem naturalmente
@@ -113,7 +159,7 @@ void FramePassed() {
     }
   } else {
     gravityCounter++;
-    if (gravityCounter >= DROP_RATE_LEVELS[level - 1]) {
+    if (gravityCounter >= DROP_RATE_LEVELS[level]) {
       MovePiece(1);
       gravityCounter = 0;
     }
@@ -129,7 +175,7 @@ void FramePassed() {
     lockCounter = 0;
   }
   PutPieceMatrix(currentPositionX, currentPositionY, true);
-  ShowBoard();
+  DrawBoard();
 }
 
 void SpawnPiece(int pieceNumber) {
@@ -223,7 +269,7 @@ int MovePiece(int action) {  //UP = 0, DOWN=1, LEFT=2, RIGHT=3
       newPositionX += 1;
       break;
     default:
-      Serial.println("[ERROR] - Action not found while moving piece");
+      //Serial.println("[ERROR] - Action not found while moving piece");
       return -1;
   }
   PutPieceMatrix(currentPositionX, currentPositionY, false);
@@ -270,13 +316,12 @@ void handleButtonPressed(int buttonNumberPressed) {
       // Share button pressed
       case 9:
         //ESP Reset
-        ESP.restart();
+        //ESP.restart();
         //Arduino Reset
-        //resetFunc();
+        resetFunc();
         break;
       // Options button pressed
       case 10:
-        Serial.println("Game unpaused");
         gameIsPaused = false;
         break;
     }
@@ -356,9 +401,9 @@ void handleButtonPressed(int buttonNumberPressed) {
     // Share button pressed
     case 9:
       //ESP Reset
-      ESP.restart();
+      //ESP.restart();
       //Arduino Reset
-      //resetFunc();
+      resetFunc();
       break;
     // Share button released
     case -9:
@@ -366,7 +411,6 @@ void handleButtonPressed(int buttonNumberPressed) {
     // Options button pressed
     case 10:
       gameIsPaused = true;
-      Serial.println("Paused");
       break;
     // Options button released
     case -10:
@@ -386,18 +430,18 @@ void SuperRotationSystem(int rotateAction) {
 
   PutPieceMatrix(currentPositionX, currentPositionY, false);
 
-  Serial.printf("Posicao inicial:\n%d %d\n", currentPositionX, currentPositionY);
+  //Serial.printf("Posicao inicial:\n%d %d\n", currentPositionX, currentPositionY);
 
   if (!RotatePiece(rotateAction)) {
-    Serial.println("Failed default");
+    //Serial.println("Failed default");
     if (!RotateTest2(oldCurrentRotation, currentRotation)) {
-      Serial.println("Failed 2");
+      //Serial.println("Failed 2");
       if (!RotateTest3(oldCurrentRotation, currentRotation)) {
-        Serial.println("Failed 3");
+        //Serial.println("Failed 3");
         if (!RotateTest4(oldCurrentRotation, currentRotation)) {
-          Serial.println("Failed 4");
+          //Serial.println("Failed 4");
           if (!RotateTest5(oldCurrentRotation, currentRotation)) {
-            Serial.println("Failed 5");
+            //Serial.println("Failed 5");
             currentRotation = oldCurrentRotation;
             memcpy(currentPieceShape, oldPieceShape, sizeof(oldPieceShape));
             PutPieceMatrix(currentPositionX, currentPositionY, true);
@@ -485,7 +529,6 @@ bool RotatePiece(int rotateAction) {
 }
 bool RotateTest2(int oldRotation, int newRotation) {
   int offsetX = 0, offsetY = 0;
-  Serial.println(pieceLetter);
   if (pieceLetter == 'I') {
 
     if ((oldRotation == 0 && newRotation == 1) || (oldRotation == 3 && newRotation == 2)) {
@@ -510,7 +553,7 @@ bool RotateTest2(int oldRotation, int newRotation) {
       offsetY = 0;
     }
   }
-  Serial.printf("2: %d %d | %d %d", currentPositionX, offsetX, currentPositionY, offsetY);
+  //Serial.printf("2: %d %d | %d %d", currentPositionX, offsetX, currentPositionY, offsetY);
   if (hasCollidedWithScreen(currentPositionX + offsetX, currentPositionY - offsetY) || hasCollidedWithPiece(currentPositionX + offsetX, currentPositionY - offsetY)) {
     return false;
   }
@@ -550,7 +593,7 @@ bool RotateTest3(int oldRotation, int newRotation) {
       offsetY = -1;
     }
   }
-  Serial.printf("3: %d %d | %d %d", currentPositionX, offsetX, currentPositionY, offsetY);
+  //Serial.printf("3: %d %d | %d %d", currentPositionX, offsetX, currentPositionY, offsetY);
   if (hasCollidedWithScreen(currentPositionX + offsetX, currentPositionY - offsetY) || hasCollidedWithPiece(currentPositionX + offsetX, currentPositionY - offsetY)) {
     return false;
   }
@@ -585,7 +628,7 @@ bool RotateTest4(int oldRotation, int newRotation) {
       offsetY = 0;
     }
   }
-  Serial.printf("4: %d %d | %d %d", currentPositionX, offsetX, currentPositionY, offsetY);
+  //Serial.printf("4: %d %d | %d %d", currentPositionX, offsetX, currentPositionY, offsetY);
   if (hasCollidedWithScreen(currentPositionX + offsetX, currentPositionY - offsetY) || hasCollidedWithPiece(currentPositionX + offsetX, currentPositionY - offsetY)) {
     return false;
   }
@@ -625,7 +668,7 @@ bool RotateTest5(int oldRotation, int newRotation) {
       offsetY = 2;
     }
   }
-  Serial.printf("5: %d %d | %d %d", currentPositionX, offsetX, currentPositionY, offsetY);
+  //Serial.printf("5: %d %d | %d %d", currentPositionX, offsetX, currentPositionY, offsetY);
   if (hasCollidedWithScreen(currentPositionX + offsetX, currentPositionY - offsetY) || hasCollidedWithPiece(currentPositionX + offsetX, currentPositionY - offsetY)) {
     return false;
   }
@@ -700,7 +743,7 @@ void GameOver() {
   Serial.println(linesCleared);
   Serial.print("Level reached: ");
   Serial.println(level);
-  SendValueToScoreboard();
+  //SendValueToScoreboard();
 }
 
 void HoldPiece() {
@@ -729,6 +772,7 @@ void HoldPiece() {
 // ******************************************************
 // LEADERBOARD
 // ******************************************************
+/*
 void ConnectToWifi() {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.print("Attempting to connect to SSID: ");
@@ -777,7 +821,7 @@ void SendPostRequest(String json) {
 
   // Configura cabeçalho do conteúdo JSON
   http.addHeader("Content-Type", "application/json");
-  http.addHeader("accept", "*/*");  // Configuração opcional dependendo da API
+  http.addHeader("accept", "/*");  // Configuração opcional dependendo da API
 
   Serial.println("A enviar score...");
   // Envie o POST e aguarde a resposta
@@ -805,7 +849,7 @@ void SendValueToScoreboard() {
     digitalWrite(DEBUG_LED_PIN, LOW);
   }
 }
-
+*/
 //DEBUG
 void ShowBoard() {
   Serial.print("\n\n\n\n\n\n\n");
@@ -813,9 +857,45 @@ void ShowBoard() {
     for (int j = 0; j < WIDTH; j++) {
       char showchar;
       tetrisBoard[i][j] == 0 ? showchar = '0' : showchar = tetrisBoard[i][j];
-      Serial.printf("%c", showchar);
+      Serial.print(showchar);
     }
     Serial.println();
   }
-  delay(100);
+}
+
+void DrawBoard() {
+  ShowBoard();
+  ResetLedMatrix();
+  for (int x = 0; x < WIDTH; ++x) {
+    for (int y = 0; y < HEIGTH; ++y) {
+      switch (tetrisBoard[y][x]) {
+        case 'I':
+          leds(x, y) = CRGB(0, 255, 255);
+          break;
+        case 'O':
+          leds(x, y) = CRGB(255, 255, 0);
+          break;
+        case 'T':
+          leds(x, y) = CRGB(128, 0, 128);
+          break;
+        case 'J':
+          leds(x, y) = CRGB(0, 255, 0);
+          break;
+        case 'L':
+          leds(x, y) = CRGB(255, 0, 0);
+          break;
+        case 'S':
+          leds(x, y) = CRGB(0, 0, 255);
+          break;
+        case 'Z':
+          leds(x, y) = CRGB(255, 127, 0);
+          break;
+        default:
+          leds(x, y) = 0;
+          break;
+      }
+    }
+  }
+  FastLED.show();
+  Serial.println("Displaying on LEDS");
 }
