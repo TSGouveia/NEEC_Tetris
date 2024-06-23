@@ -1,15 +1,24 @@
+#include <ArduinoJson.h>
+#include <ArduinoJson.hpp>
+#include <HTTPClient.h>
+#include <WiFi.h>
 #include <Wire.h>
 #include <PS4Controller.h>
 
 #define BUTTON_NUMBER 11
 #define DEBUG_LED_PIN 2
 
+#define SSID "Pastel di nata"
+#define PASS "OsMaisBilhas"
+
+#define SCOREBOARD_URL "https://keepthescore.com/api/zfhvdblbcjlme/player/"
+
 // Variable to store the previous state of each button
 bool prevButtonState[BUTTON_NUMBER] = { 0 };
 
 void setup() {
   Wire.begin();
-
+  SetupI2C();
   // MAC ADDRESS DE UM MOVEL AI
   PS4.begin("22:22:D9:D5:19:E3");
   pinMode(DEBUG_LED_PIN, OUTPUT);
@@ -69,29 +78,12 @@ void loop() {
 // LEADERBOARD
 // ******************************************************
 
-void SetupI2C(){
+void SetupI2C() {
   Wire.begin(9);                 // join i2c bus with address #8
   Wire.onReceive(receiveEvent);  // register event
 }
 
 void receiveEvent(int numBytes) {
-  // Tamanho máximo do JSON (ajuste conforme necessário)
-  const size_t capacity = JSON_OBJECT_SIZE(2) + 20;
-  StaticJsonDocument<capacity> doc;
-
-  // Lê os dados do buffer I2C
-  while (Wire.available()) {
-    char c = Wire.read();
-    // Adiciona o caractere ao JSON
-    deserializeJson(doc, c);
-  }
-
-  // Extrai os valores do JSON
-  const char* name = doc["name"];
-  int score = doc["score"];
-
-  // Chama a função SendValueToScoreboard com os valores
-  SendValueToScoreboard(name, score);
 }
 
 void ConnectToWifi() {
@@ -165,9 +157,9 @@ void SendValueToScoreboard(char* name, int score) {
   ConnectToWifi();
   String json = CriaJson(name, score);
   SendPostRequest(json);
-  WiFi.disconnect();
-  if (WiFi.status() != WL_CONNECTED) {
-    digitalWrite(DEBUG_LED_PIN, LOW);
-  }
-}
 
+  if (WiFi.status() == WL_CONNECTED) {
+    WiFi.disconnect();
+  }
+  digitalWrite(DEBUG_LED_PIN, LOW);
+}

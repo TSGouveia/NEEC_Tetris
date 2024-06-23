@@ -1,14 +1,14 @@
 #include <ArduinoJson.h>
 #include "piece_data.h"
+#include "image_matrices.h"
 #include <Wire.h>
-
 //LEDS
 #include <FastLED.h>
 #include <LEDMatrix.h>
 
 // Change the next 6 defines to match your matrix type and size
 //LEDS
-#define LED_PIN 16
+#define LED_PIN 53
 #define COLOR_ORDER RGB
 #define CHIPSET WS2812B
 
@@ -25,12 +25,7 @@
 #define TRIPLE 300
 #define TETRIS 1200
 
-#define SSID "Pastel di nata"
-#define PASS "OsMaisBilhas"
-
 #define DEBUG_LED_PIN 2
-
-#define SCOREBOARD_URL "https://keepthescore.com/api/zfhvdblbcjlme/player/"
 
 //COLORS
 #define CYAN_I 0x00FFFF
@@ -87,7 +82,7 @@ void (*resetFunc)(void) = 0;
 cLEDMatrix<MATRIX_WIDTH, MATRIX_HEIGHT, MATRIX_TYPE> leds;
 
 void setup() {
-  //Serial.begin(9600);
+  Serial.begin(115200);
   SetupPS4I2C();
 
   int pieceNumber = random(7);
@@ -103,8 +98,8 @@ void setup() {
   FastLED.show();
   delay(100);
 }
-void SetupFastLeds() {
 
+void SetupFastLeds() {
   FastLED.addLeds<CHIPSET, LED_PIN, COLOR_ORDER>(leds[0], 576);
   FastLED.addLeds<CHIPSET, LED_PIN, GRB>(leds[0], 13);
 
@@ -175,12 +170,10 @@ void FramePassed() {
     lockCounter = 0;
   }
   PutPieceMatrix(currentPositionX, currentPositionY, true);
-  DrawBoard();
+  ShowBoard();
 }
 
 void SpawnPiece(int pieceNumber) {
-  //char pieceColor[3];
-  //memcpy(pieceColor, tetrominoes_colors[pieceNumber], sizeof(tetrominoes_colors[pieceNumber]));
   currentPositionX = 5;
   currentPositionY = 3;
   currentRotation = 0;
@@ -269,7 +262,7 @@ int MovePiece(int action) {  //UP = 0, DOWN=1, LEFT=2, RIGHT=3
       newPositionX += 1;
       break;
     default:
-      //Serial.println("[ERROR] - Action not found while moving piece");
+      Serial.println("[ERROR] - Action not found while moving piece");
       return -1;
   }
   PutPieceMatrix(currentPositionX, currentPositionY, false);
@@ -315,8 +308,6 @@ void handleButtonPressed(int buttonNumberPressed) {
     switch (buttonNumberPressed) {
       // Share button pressed
       case 9:
-        //ESP Reset
-        //ESP.restart();
         //Arduino Reset
         resetFunc();
         break;
@@ -743,7 +734,7 @@ void GameOver() {
   Serial.println(linesCleared);
   Serial.print("Level reached: ");
   Serial.println(level);
-  SendScore("ABC",score);
+  SendScore("testWIP", score);
 }
 
 void HoldPiece() {
@@ -769,7 +760,8 @@ void HoldPiece() {
   canHoldPiece = false;
 }
 
-void SendScore(name,score){
+void SendScore(char* name, int score) {
+  digitalWrite(DEBUG_LED_PIN, HIGH);
   // Crie um objeto JSON com os valores que deseja enviar
   StaticJsonDocument<256> docJson;
   docJson["name"] = name;
@@ -781,8 +773,11 @@ void SendScore(name,score){
 
   // Envia o JSON para o endereço 8 via I2C
   Wire.beginTransmission(9);
-  Wire.write(json);
+  for (int i = 0; json[i] != '\0'; i++) {
+    Wire.write(json[i]);
+  }
   Wire.endTransmission();
+  digitalWrite(DEBUG_LED_PIN, LOW);
 }
 
 //DEBUG
@@ -800,10 +795,9 @@ void ShowBoard() {
 
 void DrawBoard() {
   ShowBoard();
-  ResetLedMatrix();
   for (int x = 0; x < WIDTH; ++x) {
-    for (int y = 0; y < HEIGTH; ++y) {
-      switch (tetrisBoard[y][x]) {
+    for (int y = 0; y < HEIGTH-2; ++y) {
+      switch (tetrisBoard[y+2][x]) {
         case 'I':
           leds(x, y) = CRGB(0, 255, 255);
           break;
