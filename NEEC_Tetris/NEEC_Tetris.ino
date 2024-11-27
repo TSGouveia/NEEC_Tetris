@@ -1,6 +1,18 @@
+/* 
+Dependencies:
+  ArduinoJson by Benoit Blanchon [7.2.1]
+  FastLED by Daniel Garcia [3.7.0]
+  HttpClient by Adrian McEwen [2.2.0]
+  LEDMatrix by Aaron Liddiment (https://github.com/AaronLiddiment/LEDMatrix)
+  PS4Controller by Juan Pablo Marquez [1.0.8]
+*/
+
 #include <ArduinoJson.h>
 #include "piece_data.h"
 #include "image_matrices.h"
+#include <ArduinoJson.hpp>
+#include <HttpClient.h>
+#include <WiFi.h>
 #include <Wire.h>
 //LEDS
 #include <FastLED.h>
@@ -26,6 +38,7 @@
 #define TETRIS 1200
 
 #define DEBUG_LED_PIN 2
+#define BUTTON_NUMBER 11
 
 //COLORS
 #define CYAN_I 0x00FFFF
@@ -35,6 +48,13 @@
 #define RED_Z 0xFF0000
 #define BLUE_J 0x0000FF
 #define ORANGE_L 0xFF7F00
+
+#define SSID "NEEC_2G"
+#define PASS "neecfct!"
+
+#define SCOREBOARD_URL "https://keepthescore.com/api/zfhvdblbcjlme/player/"
+
+bool prevButtonState[BUTTON_NUMBER] = { 0 };
 
 const unsigned long MICROS_PER_FRAME = 1000000.0 / FRAMES_PER_SECOND;
 const int DROP_RATE_LEVELS[15] = { 48, 43, 38, 33, 28, 23, 18, 13, 8, 6, 5, 4, 3, 2, 1 };
@@ -128,6 +148,9 @@ void loop() {
 void SetupPS4I2C() {
   Wire.begin(8);                 // join i2c bus with address #8
   Wire.onReceive(receiveEvent);  // register event
+}
+
+void receiveEvent(int numBytes) {
 }
 
 void FramePassed() {
@@ -284,13 +307,6 @@ void HardDrop() {
   while (MovePiece(1)) {
   }
   LockPiece();
-}
-
-void receiveEvent(int howMany) {
-  while (Wire.available()) {
-    int c = Wire.read();  // receive byte as a int
-    handleButtonPressed(c);
-  }
 }
 
 void LockPiece() {
@@ -734,7 +750,7 @@ void GameOver() {
   Serial.println(linesCleared);
   Serial.print("Level reached: ");
   Serial.println(level);
-  SendScore("testWIP", score);
+  //SendValueToScoreboard("testWIP", score);
 }
 
 void HoldPiece() {
@@ -771,12 +787,6 @@ void SendScore(char* name, int score) {
   char json[256];
   serializeJson(docJson, json);
 
-  // Envia o JSON para o endereço 8 via I2C
-  Wire.beginTransmission(9);
-  for (int i = 0; json[i] != '\0'; i++) {
-    Wire.write(json[i]);
-  }
-  Wire.endTransmission();
   digitalWrite(DEBUG_LED_PIN, LOW);
 }
 
@@ -796,8 +806,8 @@ void ShowBoard() {
 void DrawBoard() {
   ShowBoard();
   for (int x = 0; x < WIDTH; ++x) {
-    for (int y = 0; y < HEIGTH-2; ++y) {
-      switch (tetrisBoard[y+2][x]) {
+    for (int y = 0; y < HEIGTH - 2; ++y) {
+      switch (tetrisBoard[y + 2][x]) {
         case 'I':
           leds(x, y) = CRGB(0, 255, 255);
           break;
@@ -828,3 +838,80 @@ void DrawBoard() {
   FastLED.show();
   Serial.println("Displaying on LEDS");
 }
+
+void ConnectToWifi() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.print("Attempting to connect to SSID: ");
+    Serial.println(SSID);
+    while (WiFi.status() != WL_CONNECTED) {
+      WiFi.begin(SSID, PASS);
+      Serial.println("Connecting to WiFi");
+      while (WiFi.status() != WL_CONNECTED) {
+        delay(100);
+      }
+    }
+    Serial.println("Connected");
+    digitalWrite(DEBUG_LED_PIN, HIGH);
+  }
+}
+String CriaJson(char* playerName, int score) {
+  // Tamanho do JSON baseado nos campos fornecidos
+  const size_t capacity = JSON_OBJECT_SIZE(8);
+
+  // Criação do objeto JSON
+  DynamicJsonDocument doc(capacity);
+
+  // Preenchendo o objeto JSON com os dados
+  doc["name"] = playerName;
+  doc["score"] = score;
+  doc["is_eliminated"] = false;
+  doc["goal"] = nullptr;              // Valor null
+  doc["text_color"] = nullptr;        // Valor null
+  doc["background_color"] = nullptr;  // Valor null
+  doc["profile_image"] = nullptr;     // Valor null
+  doc["team"] = nullptr;              // Valor null
+
+  // Serializa o objeto JSON para uma string
+  String jsonStr;
+  serializeJson(doc, jsonStr);
+
+  return jsonStr;
+}
+
+/*void SendPostRequest(String json) {
+  HttpClient http;
+
+  // Configura o URL e o endpoint do servidor
+  http.begin(SCOREBOARD_URL);
+
+  // Configura cabeçalho do conteúdo JSON
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("accept", "/*");  // Configuração opcional dependendo da API
+
+  Serial.println("A enviar score...");
+  // Envie o POST e aguarde a resposta
+  int httpResponseCode = http.POST(json);
+
+  // Verifique o código de resposta
+  if (httpResponseCode > 0) {
+    String resposta = http.getString();
+    Serial.println("Score enviado com sucesso");
+  } else {
+    Serial.print("Erro a enviar score");
+    Serial.println(httpResponseCode);
+  }
+
+  // Libere os recursos
+  http.end();
+}
+
+void SendValueToScoreboard(char* name, int score) {
+  ConnectToWifi();
+  String json = CriaJson(name, score);
+  SendPostRequest(json);
+
+  if (WiFi.status() == WL_CONNECTED) {
+    WiFi.disconnect();
+  }
+  digitalWrite(DEBUG_LED_PIN, LOW);
+}*/
