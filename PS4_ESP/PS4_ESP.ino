@@ -1,33 +1,28 @@
-#include <ArduinoJson.h>
-#include <ArduinoJson.hpp>
-#include <Wire.h>
 #include <PS4Controller.h>
 
 #define BUTTON_NUMBER 11
 #define DEBUG_LED_PIN 2
-#define ESP_ADDRESS 9
-#define ARDUINO_ADDRESS 8
 
-// Variable to store the previous state of each button
+// Variável para armazenar o estado anterior de cada botão
 bool prevButtonState[BUTTON_NUMBER] = { 0 };
 
 void setup() {
-  Wire.begin();
-  SetupI2C();
-  // MAC ADDRESS DE UM MOVEL AI
-  PS4.begin("A4:CA:A0:1C:92:85");
+  Serial.begin(115200);  // Inicializa a comunicação serial para o computador
+  PS4.begin("A4:CA:A0:1C:92:85"); // Substitua pelo MAC Address do controle PS4
+
   pinMode(DEBUG_LED_PIN, OUTPUT);
-  digitalWrite(DEBUG_LED_PIN, HIGH);
+  digitalWrite(DEBUG_LED_PIN, HIGH); // LED de depuração aceso inicialmente
 }
 
 void loop() {
-  // Below has all accessible outputs from the controller
   if (PS4.isConnected()) {
-    digitalWrite(DEBUG_LED_PIN, LOW);
+    digitalWrite(DEBUG_LED_PIN, LOW); // LED apagado quando conectado
+
     if (PS4.PSButton() && PS4.Options()) {
-      ESP.restart();
+      ESP.restart(); // Se PS e Options pressionados, reinicia o ESP32
     }
-    // Check each button state
+
+    // Verifica o estado de cada botão
     bool buttonState[BUTTON_NUMBER] = {
       PS4.Right(),
       PS4.Down(),
@@ -42,37 +37,24 @@ void loop() {
       PS4.PSButton(),
     };
 
-    // Iterate through each button
+    // Envia os dados dos botões via UART
     for (int i = 0; i < BUTTON_NUMBER; i++) {
-      // Check if the button is currently pressed and was not pressed previously
-      //BUTTON WAS PRESSED
       if (buttonState[i] && !prevButtonState[i]) {
-        // Send data corresponding to the button
-
-        Wire.beginTransmission(ARDUINO_ADDRESS);
-        Wire.write(i + 1);
-        Wire.endTransmission();
+        // Botão foi pressionado
+        sendUART(i + 1);  // Envia o valor positivo
+      } else if (!buttonState[i] && prevButtonState[i]) {
+        // Botão foi solto
+        sendUART(-(i + 1)); // Envia o valor negativo
       }
-      //BUTTON WAS RELEASED
-      if (!buttonState[i] && prevButtonState[i]) {
-        // Send data corresponding to the button
-        Wire.beginTransmission(ARDUINO_ADDRESS);
-        Wire.write(-(i + 1));
-        Wire.endTransmission();
-      }
-      // Update the previous state of the button
+      // Atualiza o estado anterior do botão
       prevButtonState[i] = buttonState[i];
     }
 
-    // Add a small delay to prevent spamming I2C
-    delay(10);
+    delay(10); // Delay para não sobrecarregar a UART
   }
 }
 
-void SetupI2C() {
-  Wire.begin(ESP_ADDRESS);                  
-  Wire.onReceive(receiveEvent);  // register event
-}
-
-void receiveEvent(int numBytes) {
+// Função para enviar dados via UART (Serial)
+void sendUART(int data) {
+  Serial.println(data);  // Envia o dado via UART (pinos 1 e 3 do ESP32)
 }

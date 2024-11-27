@@ -4,9 +4,8 @@ Dependencies:
   FastLED by Daniel Garcia [3.7.0]
   HttpClient by Adrian McEwen [2.2.0]
   LEDMatrix by Aaron Liddiment (https://github.com/AaronLiddiment/LEDMatrix)
-  PS4Controller by Juan Pablo Marquez [1.0.8]
 */
-
+#include <SoftwareSerial.h>
 #include <ArduinoJson.h>
 #include "piece_data.h"
 #include "image_matrices.h"
@@ -20,7 +19,7 @@ Dependencies:
 
 // Change the next 6 defines to match your matrix type and size
 //LEDS
-#define LED_PIN 53
+#define LED_PIN 10
 #define COLOR_ORDER RGB
 #define CHIPSET WS2812B
 
@@ -49,6 +48,13 @@ Dependencies:
 #define BLUE_J 0x0000FF
 #define ORANGE_L 0xFF7F00
 
+//SERIAL
+#define RX_PIN 0  // Pino RX do Arduino
+#define TX_PIN 1  // Pino TX do Arduino
+
+SoftwareSerial PS4Serial(RX_PIN, TX_PIN);  // Cria um objeto SoftwareSerial
+
+//WIFI
 #define SSID "NEEC_2G"
 #define PASS "neecfct!"
 
@@ -101,22 +107,9 @@ void (*resetFunc)(void) = 0;
 //MESA DE LEDS
 cLEDMatrix<MATRIX_WIDTH, MATRIX_HEIGHT, MATRIX_TYPE> leds;
 
-void setup() {
-  Serial.begin(115200);
-  SetupPS4I2C();
-
-  int pieceNumber = random(7);
-  SpawnPiece(pieceNumber);
-
-  debugTimer = micros();
-
-  pinMode(DEBUG_LED_PIN, OUTPUT);
-
-  SetupFastLeds();
-
-  ResetLedMatrix();
-  FastLED.show();
-  delay(100);
+void SetupSerial() {
+  PS4Serial.begin(115200);  // Inicia a comunicação serial com o ESP32
+  Serial.begin(115200);     // Inicia a comunicação serial com o monitor serial para depuração
 }
 
 void SetupFastLeds() {
@@ -134,23 +127,18 @@ void ResetLedMatrix() {
     }
   }
 }
-void loop() {
-
-  frameTimer = micros();
-  while (micros() - frameTimer < MICROS_PER_FRAME) {
-    //26000 iterações cá dentro, deve ser suficiente para os controlos responderem naturalmente
-  }
-  if (!gameIsPaused) {
-    FramePassed();
-  }
-}
 
 void SetupPS4I2C() {
+  Serial.println("I2C");
   Wire.begin(8);                 // join i2c bus with address #8
   Wire.onReceive(receiveEvent);  // register event
 }
 
-void receiveEvent(int numBytes) {
+void receiveEvent(int howMany) {
+  while (Wire.available()) {
+    int c = Wire.read();  // receive byte as a int
+    handleButtonPressed(c);
+  }
 }
 
 void FramePassed() {
@@ -320,6 +308,7 @@ void LockPiece() {
 }
 
 void handleButtonPressed(int buttonNumberPressed) {
+  //Serial.println(buttonNumberPressed);
   if (gameIsPaused) {
     switch (buttonNumberPressed) {
       // Share button pressed
@@ -331,8 +320,6 @@ void handleButtonPressed(int buttonNumberPressed) {
       case 10:
         gameIsPaused = false;
         break;
-    }
-    if (buttonNumberPressed == 10) {
     }
     return;
   }
@@ -876,6 +863,39 @@ String CriaJson(char* playerName, int score) {
   serializeJson(doc, jsonStr);
 
   return jsonStr;
+}
+
+void setup() {
+  SetupSerial();
+
+  int pieceNumber = random(7);
+  SpawnPiece(pieceNumber);
+
+  debugTimer = micros();
+
+  pinMode(DEBUG_LED_PIN, OUTPUT);
+
+  SetupFastLeds();
+
+  ResetLedMatrix();
+  FastLED.show();
+}
+
+void loop() {
+  int i = 0;
+  frameTimer = micros();
+  while (micros() - frameTimer < MICROS_PER_FRAME) {
+    int receivedData = 0;
+    if (PS4Serial.available() > 0) {
+      receivedData = PS4Serial.parseInt();  // Lê o dado enviado pelo ESP32
+      if (receivedData != 0) {
+        handleButtonPressed(receivedData);
+      }
+    }
+    if (!gameIsPaused) {
+      FramePassed();
+    }
+  }
 }
 
 /*void SendPostRequest(String json) {
