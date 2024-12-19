@@ -8,7 +8,7 @@ bool prevButtonState[BUTTON_NUMBER] = { 0 };
 
 void setup() {
   Serial.begin(115200);  // Inicializa a comunicação serial para o computador
-  PS4.begin("A4:CA:A0:1C:92:85"); // Substitua pelo MAC Address do controle PS4
+  PS4.begin("A4:CA:A0:1C:92:85"); // Substitua pelo MAC Address do control e PS4
 
   pinMode(DEBUG_LED_PIN, OUTPUT);
   digitalWrite(DEBUG_LED_PIN, HIGH); // LED de depuração aceso inicialmente

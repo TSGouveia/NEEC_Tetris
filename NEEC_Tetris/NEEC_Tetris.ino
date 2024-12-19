@@ -109,7 +109,7 @@ cLEDMatrix<MATRIX_WIDTH, MATRIX_HEIGHT, MATRIX_TYPE> leds;
 
 void SetupSerial() {
   PS4Serial.begin(115200);  // Inicia a comunicação serial com o ESP32
-  Serial.begin(115200);     // Inicia a comunicação serial com o monitor serial para depuração
+  //Serial.begin(115200);     // Inicia a comunicação serial com o monitor serial para depuração
 }
 
 void SetupFastLeds() {
@@ -126,12 +126,6 @@ void ResetLedMatrix() {
       leds(x, y) = 0;
     }
   }
-}
-
-void SetupPS4I2C() {
-  Serial.println("I2C");
-  Wire.begin(8);                 // join i2c bus with address #8
-  Wire.onReceive(receiveEvent);  // register event
 }
 
 void receiveEvent(int howMany) {
@@ -181,7 +175,7 @@ void FramePassed() {
     lockCounter = 0;
   }
   PutPieceMatrix(currentPositionX, currentPositionY, true);
-  ShowBoard();
+  DrawBoard();
 }
 
 void SpawnPiece(int pieceNumber) {
@@ -330,7 +324,7 @@ void handleButtonPressed(int buttonNumberPressed) {
     // RIGHT button pressed
     case 1:
       rightIsPressed = true;
-      MovePiece(3);
+      MovePiece(2);
       dasCounter = 0;
       break;
     // RIGHT button released
@@ -357,7 +351,7 @@ void handleButtonPressed(int buttonNumberPressed) {
     // LEFT button pressed
     case 4:
       leftIsPressed = true;
-      MovePiece(2);
+      MovePiece(3);
       dasCounter = 0;
       break;
     // LEFT button released
@@ -792,32 +786,37 @@ void ShowBoard() {
 
 void DrawBoard() {
   ShowBoard();
+  int horizontalOffset = 4;
+  int verticalOffset = 12;
+
+  DrawBackground();
+
   for (int x = 0; x < WIDTH; ++x) {
     for (int y = 0; y < HEIGTH - 2; ++y) {
       switch (tetrisBoard[y + 2][x]) {
         case 'I':
-          leds(x, y) = CRGB(0, 255, 255);
+          leds(y + verticalOffset, x + horizontalOffset) = CRGB(0, 255, 255);
           break;
         case 'O':
-          leds(x, y) = CRGB(255, 255, 0);
+          leds(y + verticalOffset, x + horizontalOffset) = CRGB(255, 255, 0);
           break;
         case 'T':
-          leds(x, y) = CRGB(128, 0, 128);
+          leds(y + verticalOffset, x + horizontalOffset) = CRGB(128, 0, 128);
           break;
         case 'J':
-          leds(x, y) = CRGB(0, 255, 0);
+          leds(y + verticalOffset, x + horizontalOffset) = CRGB(0, 255, 0);
           break;
         case 'L':
-          leds(x, y) = CRGB(255, 0, 0);
+          leds(y + verticalOffset, x + horizontalOffset) = CRGB(255, 0, 0);
           break;
         case 'S':
-          leds(x, y) = CRGB(0, 0, 255);
+          leds(y + verticalOffset, x + horizontalOffset) = CRGB(0, 0, 255);
           break;
         case 'Z':
-          leds(x, y) = CRGB(255, 127, 0);
+          leds(y + verticalOffset, x + horizontalOffset) = CRGB(255, 127, 0);
           break;
         default:
-          leds(x, y) = 0;
+          leds(y + verticalOffset, x + horizontalOffset) = 0;
           break;
       }
     }
@@ -894,6 +893,14 @@ void loop() {
     }
     if (!gameIsPaused) {
       FramePassed();
+    }
+  }
+}
+
+void DrawBackground() {
+  for (int x = 0; x < MATRIX_WIDTH; ++x) {
+    for (int y = 0; y < MATRIX_HEIGHT; ++y) {
+      leds(x, y) = TetrisNEEC[x][y];
     }
   }
 }
